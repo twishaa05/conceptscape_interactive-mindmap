@@ -12,6 +12,9 @@ Setup:
     python app.py
 """
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import os
@@ -475,44 +478,55 @@ def explain():
             fallback = f"{label} is a node extracted from the webpage hierarchy."
         return jsonify({"explanation": fallback})
 
-    context_limit = 1800 if level in {"root", "section"} else 1400
-    context = body_text[:context_limit]
+
+
+    #context logic based on chunking instead of picking the first 1800 or 1400 characters
+    #we need a little buffer as between 350-390 retrieval will become useful, but below 300 we are saving computation significantly
+    if not body_text or len(body_text.strip()) < 300:
+        context = body_text or ""
+    
+    else:
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=400,
+            chunk_overlap=50
+        )
+
+        chunks = splitter.split_text(body_text)
+
+        if chunks:
+            chunk_embeddings = embedder.encode(chunks).astype("float32")
+            query_embedding = embedder.encode([label]).astype("float32")
+
+            index = faiss.IndexFlatL2(chunk_embeddings.shape[1])
+            index.add(chunk_embeddings)
+
+            k = min(3, len(chunks))
+            distances, indices = index.search(query_embedding, k)
+
+            top_chunks = [chunks[i] for i in indices[0]]
+            context = "\n\n".join(top_chunks)
+        else:
+            context = ""
 
     if context:
         prompt = f"""
-You are explaining a node from an interactive webpage mindmap.
+Concept: {label}
 
-Node title: {label}
-Node type: {level}
-Webpage context:
+Information:
 {context}
 
-Task:
-Write a clear explanation of this node in 3 to 4 complete lines.
-Use the webpage context as the main source.
-Explain the main meaning, important details, and why it matters in this topic.
-Use simple beginner-friendly language.
-Do not use bullet points.
-Do not use markdown.
-Do not write a heading.
-Do not stop mid-sentence.
-End with a complete sentence.
+Write a clear beginner-friendly explanation in 4 to 5 complete sentences about the concept.
+Base your answer primarily on the given information, but you may add small missing details if needed for clarity.
+Do not use bullet points or markdown.
+Do not leave any sentences incomplete.
 """
     else:
         prompt = f"""
-You are explaining a node from an interactive webpage mindmap.
+Concept: {label}
 
-Node title: {label}
-Node type: {level}
-
-Task:
-Write a clear explanation of this node in 3 to 4 complete lines.
-Use simple beginner-friendly language.
-Do not use bullet points.
-Do not use markdown.
-Do not write a heading.
-Do not stop mid-sentence.
-End with a complete sentence.
+Write a clear beginner-friendly explanation in 4 to 5 complete sentences about the concept.
+Do not use bullet points or markdown.
+Do not leave any sentences incomplete.
 """
 
     try:

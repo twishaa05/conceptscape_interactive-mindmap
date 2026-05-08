@@ -27,7 +27,7 @@
   --muted:#636e72;
   --muted2:#2d3436;
 
-  /* node colors — meaningful like Spotify mood colors */
+  /* node colors — meaningful */
   --node-root:#6c5ce7;
   --node-section:#00b894;
   --node-concept:#2d3436;
@@ -851,7 +851,7 @@ async function fetchAndShowExplanation(n) {
   try {
     const res  = await fetch(`${BACKEND}/explain`, {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ label:n.label||n.id, body_text:n.body_text||'', level:n.level||'concept', gemini_key:"AIzaSyDeF9p1Oo3wBkO7e-0x-GrHn1whwAjNivU" })
+      body: JSON.stringify({ label:n.label||n.id, body_text:n.body_text||'', level:n.level||'concept'})
     });
     const data = await res.json();
     resultEl.innerHTML = `
