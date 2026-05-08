@@ -1,0 +1,11 @@
+flask
+flask-cors
+beautifulsoup4
+lxml
+llama-index
+sentence-transformers
+faiss-cpu
+spacy
+langchain-text-splitters
+networkx
+requests

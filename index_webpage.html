@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MindMap Explorer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.css">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0d0d14;
+  --surface:#141420;
+  --surface2:#1b1b2a;
+  --surface3:#222235;
+  --border:#2a2a40;
+  --border2:#363655;
+  --accent:#6c5ce7;
+  --accent-light:#a29bfe;
+  --teal:#00cec9;
+  --teal-light:#81ecec;
+  --green:#00b894;
+  --yellow:#fdcb6e;
+  --red:#d63031;
+  --text:#dfe6e9;
+  --text2:#b2bec3;
+  --muted:#636e72;
+  --muted2:#2d3436;
+
+  /* node colors — meaningful like Spotify mood colors */
+  --node-root:#6c5ce7;
+  --node-section:#00b894;
+  --node-concept:#2d3436;
+  --node-dynamic-border:#00cec9;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;height:100vh;overflow:hidden;display:flex;flex-direction:column;}
+
+/* ── UPLOAD SCREEN ── */
+#upload-screen{
+  position:fixed;inset:0;z-index:100;
+  display:flex;align-items:stretch;
+  background:var(--bg);
+}
+
+/* Left branding panel */
+.upload-left{
+  width:380px;flex-shrink:0;
+  background:linear-gradient(160deg,#1a1040 0%,#0d0d14 60%);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;
+  justify-content:center;padding:60px 48px;
+  position:relative;overflow:hidden;
+}
+.upload-left::before{
+  content:'';position:absolute;
+  width:500px;height:500px;
+  background:radial-gradient(circle,rgba(108,92,231,0.15) 0%,transparent 70%);
+  top:-100px;left:-100px;
+  pointer-events:none;
+}
+.brand-icon{
+  width:52px;height:52px;
+  background:var(--accent);
+  border-radius:14px;
+  display:flex;align-items:center;justify-content:center;
+  margin-bottom:28px;
+  font-size:24px;
+}
+.brand-title{font-size:28px;font-weight:700;line-height:1.2;margin-bottom:12px;}
+.brand-title em{font-style:normal;color:var(--accent-light);}
+.brand-desc{font-size:14px;color:var(--text2);line-height:1.7;margin-bottom:40px;font-weight:400;}
+.feature-list{display:flex;flex-direction:column;gap:12px;}
+.feature-item{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text2);}
+.feature-dot{width:6px;height:6px;border-radius:50%;background:var(--teal);flex-shrink:0;}
+
+/* Right upload panel */
+.upload-right{
+  flex:1;
+  display:flex;flex-direction:column;
+  justify-content:center;align-items:center;
+  padding:60px;
+}
+.upload-right-inner{width:100%;max-width:480px;}
+.tab-row{
+  display:flex;gap:4px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:4px;
+  margin-bottom:28px;
+}
+.tab-btn{
+  flex:1;padding:9px 16px;
+  border:none;border-radius:9px;
+  background:transparent;
+  color:var(--muted);
+  font-family:'Inter',sans-serif;
+  font-size:13px;font-weight:500;
+  cursor:pointer;transition:all .2s;
+}
+.tab-btn.active{background:var(--surface3);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.3);}
+.tab-content{display:none;}
+.tab-content.active{display:block;}
+
+/* Upload tab */
+.section-label{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;font-weight:500;}
+.drop-zone{
+  border:1.5px dashed var(--border2);
+  border-radius:14px;padding:36px;
+  text-align:center;cursor:pointer;
+  transition:all .2s;position:relative;
+  background:var(--surface);
+  margin-bottom:20px;
+}
+.drop-zone:hover,.drop-zone.over{border-color:var(--accent);background:rgba(108,92,231,.05);}
+.drop-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.drop-icon{width:44px;height:44px;margin:0 auto 12px;background:rgba(108,92,231,.12);border-radius:12px;display:flex;align-items:center;justify-content:center;}
+.drop-icon svg{width:20px;height:20px;stroke:var(--accent-light);fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;}
+.drop-zone p{font-size:13px;color:var(--muted);}
+.drop-zone .fname{font-size:13px;color:var(--teal-light);margin-top:8px;font-family:'DM Mono',monospace;}
+.btn-primary{
+  width:100%;background:var(--accent);color:#fff;border:none;
+  border-radius:12px;padding:14px;
+  font-family:'Inter',sans-serif;font-size:14px;font-weight:600;
+  cursor:pointer;transition:all .2s;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.btn-primary:hover{background:var(--accent-light);transform:translateY(-1px);}
+.btn-primary:disabled{opacity:.35;cursor:not-allowed;transform:none;}
+
+/* Sample tab */
+.sample-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;}
+.sample-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:12px;padding:16px;cursor:pointer;
+  transition:all .2s;display:flex;flex-direction:column;gap:6px;
+}
+.sample-card:hover{border-color:var(--accent);background:var(--surface2);}
+.sample-card.selected{border-color:var(--teal);background:rgba(0,206,201,.06);}
+.sample-icon{font-size:22px;}
+.sample-title{font-size:13px;font-weight:600;color:var(--text);}
+.sample-desc{font-size:11px;color:var(--muted);line-height:1.5;}
+.sample-note{font-size:12px;color:var(--muted);text-align:center;font-family:'DM Mono',monospace;}
+
+.err-msg{
+  font-size:12px;color:var(--red);
+  font-family:'DM Mono',monospace;
+  padding:10px 14px;background:rgba(214,48,49,.07);
+  border:1px solid rgba(214,48,49,.2);border-radius:9px;
+  margin-top:12px;display:none;
+}
+.foot{font-size:11px;color:var(--muted);text-align:center;margin-top:14px;font-family:'DM Mono',monospace;}
+
+/* ── LOADING ── */
+#loading-overlay{
+  position:fixed;inset:0;z-index:150;background:var(--bg);
+  display:none;flex-direction:column;align-items:center;justify-content:center;gap:0;
+}
+.load-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:20px;padding:40px 48px;
+  display:flex;flex-direction:column;align-items:center;gap:20px;
+  width:380px;
+}
+.load-title{font-size:16px;font-weight:700;color:var(--text);}
+.load-sub{font-size:12px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:-8px;}
+.load-bar{width:100%;height:3px;background:var(--border);border-radius:3px;overflow:hidden;}
+.load-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--teal));border-radius:3px;animation:ind 1.5s ease infinite;width:50%;}
+@keyframes ind{0%{transform:translateX(-200%)}100%{transform:translateX(400%)}}
+.load-steps{width:100%;display:flex;flex-direction:column;gap:9px;}
+.ls{font-size:12px;font-family:'DM Mono',monospace;color:var(--muted);display:flex;align-items:center;gap:9px;transition:color .3s;}
+.ls.active{color:var(--teal-light);}
+.ls.done{color:var(--muted);}
+.ls-dot{width:6px;height:6px;border-radius:50%;background:var(--border2);flex-shrink:0;transition:background .3s;}
+.ls.active .ls-dot{background:var(--teal);}
+.ls.done .ls-dot{background:var(--muted);}
+.ls.done::after{content:'✓';margin-left:auto;font-size:11px;color:var(--green);}
+
+/* ── APP SCREEN ── */
+#app-screen{display:none;flex-direction:column;height:100vh;}
+
+/* Top header */
+.app-header{
+  display:flex;align-items:center;
+  padding:0 20px;
+  height:54px;
+  border-bottom:1px solid var(--border);
+  background:rgba(13,13,20,.9);
+  backdrop-filter:blur(12px);
+  flex-shrink:0;gap:12px;
+}
+.app-logo{font-size:15px;font-weight:700;color:var(--accent-light);margin-right:4px;}
+.divider-v{width:1px;height:20px;background:var(--border);flex-shrink:0;}
+.doc-chip{
+  display:flex;align-items:center;gap:6px;
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:8px;padding:5px 10px;
+  font-size:12px;color:var(--text2);
+  font-family:'DM Mono',monospace;
+  max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.doc-chip span{color:var(--text);}
+.breadcrumb{display:flex;align-items:center;gap:4px;font-size:12px;font-family:'DM Mono',monospace;flex:1;justify-content:center;}
+.bc{cursor:pointer;padding:4px 8px;border-radius:6px;color:var(--muted);transition:all .15s;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bc:hover{background:var(--surface2);color:var(--text);}
+.bc.active{color:var(--accent-light);}
+.bc-sep{color:var(--border2);}
+.header-actions{display:flex;align-items:center;gap:8px;margin-left:auto;}
+.icon-btn{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:8px;padding:6px 12px;color:var(--text2);
+  font-size:12px;cursor:pointer;transition:all .15s;
+  display:flex;align-items:center;gap:6px;
+  font-family:'Inter',sans-serif;font-weight:500;
+}
+.icon-btn:hover{color:var(--text);border-color:var(--border2);}
+
+/* Stats bar */
+.stats-bar{
+  display:flex;align-items:center;gap:0;
+  border-bottom:1px solid var(--border);
+  background:var(--surface);
+  flex-shrink:0;
+  overflow:hidden;
+}
+.stat-item{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  padding:10px 16px;
+  border-right:1px solid var(--border);
+}
+.stat-item:last-child{border-right:none;}
+.stat-val{font-size:18px;font-weight:700;color:var(--text);line-height:1;}
+.stat-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:3px;font-family:'DM Mono',monospace;}
+
+/* Main layout: tabs + graph + sidebar */
+.app-body{flex:1;display:flex;overflow:hidden;}
+
+/* Left tab strip */
+.left-tabs{
+  width:48px;flex-shrink:0;
+  background:var(--surface);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;
+  align-items:center;padding:12px 0;gap:6px;
+}
+.lt-btn{
+  width:36px;height:36px;border-radius:9px;border:none;
+  background:transparent;color:var(--muted);
+  cursor:pointer;transition:all .15s;
+  display:flex;align-items:center;justify-content:center;
+  font-size:17px;
+}
+.lt-btn:hover{background:var(--surface2);color:var(--text);}
+.lt-btn.active{background:rgba(108,92,231,.15);color:var(--accent-light);}
+.lt-btn[title]{position:relative;}
+
+/* Graph area */
+.graph-area{flex:1;position:relative;overflow:hidden;}
+#mynetwork{width:100%;height:100%;background:transparent;}
+
+/* Sidebar panel (replaces floating context menu + explain popup) */
+.sidebar{
+  width:300px;flex-shrink:0;
+  background:var(--surface);
+  border-left:1px solid var(--border);
+  display:flex;flex-direction:column;
+  transition:width .25s ease;
+  overflow:hidden;
+}
+.sidebar.collapsed{width:0;}
+.sidebar-header{
+  padding:16px 18px 12px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;
+}
+.sidebar-title{font-size:13px;font-weight:600;color:var(--text2);}
+.sidebar-close{background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;transition:color .15s;}
+.sidebar-close:hover{color:var(--text);}
+.sidebar-body{flex:1;overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:14px;}
+.sidebar-empty{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;color:var(--muted);font-size:13px;text-align:center;padding:24px;
+  font-family:'DM Mono',monospace;
+}
+.sidebar-empty .empty-icon{font-size:32px;opacity:.4;}
+
+/* Node info card in sidebar */
+.node-card{background:var(--surface2);border-radius:12px;padding:14px;border:1px solid var(--border);}
+.node-card-header{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.node-level-badge{
+  font-size:10px;font-family:'DM Mono',monospace;
+  padding:2px 8px;border-radius:99px;letter-spacing:.06em;text-transform:uppercase;
+}
+.badge-root{background:rgba(108,92,231,.15);color:var(--accent-light);border:1px solid rgba(108,92,231,.3);}
+.badge-section{background:rgba(0,184,148,.12);color:#55efc4;border:1px solid rgba(0,184,148,.25);}
+.badge-concept{background:rgba(99,110,114,.12);color:var(--text2);border:1px solid var(--border);}
+.badge-dynamic{background:rgba(0,206,201,.1);color:var(--teal-light);border:1px solid rgba(0,206,201,.2);}
+.node-name{font-size:14px;font-weight:600;color:var(--text);line-height:1.3;}
+.node-meta{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:4px;}
+
+/* Action buttons in sidebar */
+.action-btn{
+  width:100%;display:flex;align-items:center;gap:10px;
+  padding:11px 13px;border-radius:10px;border:1px solid var(--border);
+  background:var(--surface3);color:var(--text);
+  font-family:'Inter',sans-serif;font-size:13px;font-weight:500;
+  cursor:pointer;transition:all .15s;text-align:left;
+}
+.action-btn:hover:not(:disabled){background:var(--surface2);border-color:var(--border2);}
+.action-btn:disabled{opacity:.3;cursor:not-allowed;}
+.action-btn.explore-btn{color:var(--accent-light);border-color:rgba(108,92,231,.3);background:rgba(108,92,231,.07);}
+.action-btn.explore-btn:hover:not(:disabled){background:rgba(108,92,231,.12);}
+.action-btn .a-ico{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.explain-ico{background:rgba(0,184,148,.1);}
+.explore-ico{background:rgba(108,92,231,.1);}
+.a-sub{font-size:11px;color:var(--muted);display:block;margin-top:1px;font-weight:400;}
+
+/* Explain result box */
+.explain-box{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:10px;padding:14px;
+  font-family:'DM Mono',monospace;font-size:12px;
+  color:var(--text);line-height:1.7;
+  min-height:60px;
+}
+.explain-box.loading{display:flex;align-items:center;gap:8px;color:var(--muted);}
+.spinner{width:14px;height:14px;border:2px solid var(--border2);border-top-color:var(--teal);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.explain-powered{font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:6px;text-align:right;}
+
+/* ── LEFT PANEL TABS ── */
+.panel-tab{display:none;flex-direction:column;height:100%;overflow:hidden;}
+.panel-tab.active{display:flex;}
+
+/* Search panel */
+.search-form{display:flex;gap:8px;margin-bottom:14px;}
+.search-input{
+  flex:1;background:var(--surface2);border:1px solid var(--border);
+  border-radius:9px;padding:9px 12px;color:var(--text);
+  font-family:'DM Mono',monospace;font-size:12px;outline:none;
+  transition:border-color .2s;
+}
+.search-input:focus{border-color:var(--accent);}
+.search-input::placeholder{color:var(--muted);}
+.search-go{
+  background:var(--accent);border:none;border-radius:9px;
+  padding:9px 14px;color:#fff;font-size:12px;font-weight:600;
+  cursor:pointer;transition:background .2s;font-family:'Inter',sans-serif;
+  flex-shrink:0;
+}
+.search-go:hover{background:var(--accent-light);}
+.sr-card{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:10px;padding:12px;cursor:pointer;transition:all .15s;
+  margin-bottom:8px;
+}
+.sr-card:hover{border-color:var(--accent);}
+.sr-section{font-size:11px;color:var(--accent-light);font-family:'DM Mono',monospace;margin-bottom:4px;}
+.sr-text{font-size:12px;color:var(--text2);line-height:1.55;font-family:'DM Mono',monospace;}
+.sr-score{font-size:10px;color:var(--muted);margin-top:5px;font-family:'DM Mono',monospace;}
+.no-results{font-size:12px;color:var(--muted);font-family:'DM Mono',monospace;text-align:center;padding:16px;}
+
+/* Legend panel */
+.legend-section{margin-bottom:20px;}
+.legend-heading{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-family:'DM Mono',monospace;margin-bottom:10px;}
+.legend-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:13px;color:var(--text2);}
+.legend-swatch{width:14px;height:14px;border-radius:50%;flex-shrink:0;}
+.legend-swatch.box{border-radius:3px;}
+.legend-sub{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;}
+
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px;}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════
+     UPLOAD SCREEN
+════════════════════════════════════════════════ -->
+<div id="upload-screen">
+
+  <!-- Left branding -->
+  <div class="upload-left">
+    <div class="brand-icon">🗺️</div>
+    <div class="brand-title">Webpage <em>MindMap</em><br>Explorer</div>
+    <div class="brand-desc">Enter any webpage URL and turn it into an interactive, explorable knowledge graph using HTMLNodeParser.</div>
+    <div class="feature-list">
+      <div class="feature-item"><div class="feature-dot"></div>Extracts headings, sections &amp; concepts</div>
+      <div class="feature-item"><div class="feature-dot"></div>Interactive node-by-node exploration</div>
+      <div class="feature-item"><div class="feature-dot"></div>AI explanations via Gemini</div>
+      <div class="feature-item"><div class="feature-dot"></div>Semantic search across the document</div>
+      <div class="feature-item"><div class="feature-dot"></div>Parses webpage HTML into structured knowledge nodes</div>
+    </div>
+  </div>
+
+  <!-- Right form -->
+  <div class="upload-right">
+    <div class="upload-right-inner">
+
+      <!-- Tabs: Webpage URL / Try a Sample -->
+      <div class="tab-row">
+        <button class="tab-btn active" id="tab-upload-btn" onclick="switchUploadTab('upload')">🌐 Webpage URL</button>
+        <button class="tab-btn" id="tab-sample-btn" onclick="switchUploadTab('sample')">🧪 Try a Sample Topic</button>
+      </div>
+
+      <!-- Upload tab -->
+      <div class="tab-content active" id="tab-upload">
+        <div class="section-label">Webpage URL</div>
+        <div class="drop-zone" id="drop-zone">
+          <input type="url" id="url-input" placeholder="https://en.wikipedia.org/wiki/Machine_learning" style="position:static;opacity:1;width:100%;height:auto;background:#1b1b2a;border:1px solid #363655;border-radius:10px;padding:13px;color:#dfe6e9;font-family:DM Mono,monospace;font-size:12px;outline:none;">
+          <div class="fname" id="fname">Paste a public webpage URL to generate a mindmap.</div>
+        </div>
+        <button class="btn-primary" id="go-btn" disabled>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+          Generate Mindmap
+        </button>
+      </div>
+
+      <!-- Sample tab -->
+      <div class="tab-content" id="tab-sample">
+        <div class="section-label">Pick a sample to explore</div>
+        <div class="sample-grid">
+          <div class="sample-card" onclick="selectSample(this,'research')">
+            <div class="sample-icon">🔬</div>
+            <div class="sample-title">Research Paper</div>
+            <div class="sample-desc">Academic structure with abstract, methods, results</div>
+          </div>
+          <div class="sample-card" onclick="selectSample(this,'textbook')">
+            <div class="sample-icon">📚</div>
+            <div class="sample-title">Textbook Chapter</div>
+            <div class="sample-desc">Hierarchical concepts with definitions and examples</div>
+          </div>
+          <div class="sample-card" onclick="selectSample(this,'report')">
+            <div class="sample-icon">📊</div>
+            <div class="sample-title">Business Report</div>
+            <div class="sample-desc">Executive summary, findings, recommendations</div>
+          </div>
+          <div class="sample-card" onclick="selectSample(this,'technical')">
+            <div class="sample-icon">⚙️</div>
+            <div class="sample-title">Technical Doc</div>
+            <div class="sample-desc">API docs, specs, architecture overview</div>
+          </div>
+        </div>
+        <p class="sample-note">↑ Select a type, then paste a matching webpage URL above</p>
+      </div>
+
+      <div id="err-msg" class="err-msg"></div>
+      <p class="foot">Runs locally via Flask · HTMLNodeParser extracts webpage nodes · Gemini explains nodes</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     LOADING
+════════════════════════════════════════════════ -->
+<div id="loading-overlay">
+  <div class="load-card">
+    <div class="load-title">Building Knowledge Map</div>
+    <div class="load-sub" id="load-sub">Analysing your document...</div>
+    <div class="load-bar"><div class="load-fill"></div></div>
+    <div class="load-steps">
+      <div class="ls" id="ls-1"><div class="ls-dot"></div>Fetching webpage HTML</div>
+      <div class="ls" id="ls-2"><div class="ls-dot"></div>Parsing HTML hierarchy</div>
+      <div class="ls" id="ls-3"><div class="ls-dot"></div>Chunking webpage content</div>
+      <div class="ls" id="ls-4"><div class="ls-dot"></div>Extracting key concepts</div>
+      <div class="ls" id="ls-5"><div class="ls-dot"></div>Building knowledge graph</div>
+      <div class="ls" id="ls-6"><div class="ls-dot"></div>Rendering interactive mindmap</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     APP SCREEN
+════════════════════════════════════════════════ -->
+<div id="app-screen">
+
+  <!-- Top header -->
+  <div class="app-header">
+    <div class="app-logo">🗺️ MindMap</div>
+    <div class="divider-v"></div>
+    <div class="doc-chip" id="doc-chip">No document</div>
+    <div class="breadcrumb" id="breadcrumb"></div>
+    <div class="header-actions">
+      <button class="icon-btn" id="new-map-btn">← New Map</button>
+    </div>
+  </div>
+
+  <!-- Stats bar -->
+  <div class="stats-bar" id="stats-bar">
+    <div class="stat-item"><div class="stat-val" id="stat-pages">—</div><div class="stat-lbl">Pages</div></div>
+    <div class="stat-item"><div class="stat-val" id="stat-sections">—</div><div class="stat-lbl">Sections</div></div>
+    <div class="stat-item"><div class="stat-val" id="stat-concepts">—</div><div class="stat-lbl">Concepts</div></div>
+    <div class="stat-item"><div class="stat-val" id="stat-dynamic">—</div><div class="stat-lbl">Explorable Nodes</div></div>
+    <div class="stat-item"><div class="stat-val" id="stat-nodes">—</div><div class="stat-lbl">Total Nodes</div></div>
+  </div>
+
+  <!-- Main body -->
+  <div class="app-body">
+
+    <!-- Left icon tab strip -->
+    <div class="left-tabs">
+      <button class="lt-btn active" title="Node Info" id="lt-info" onclick="switchLeftTab('info')">🔍</button>
+      <button class="lt-btn" title="Search" id="lt-search" onclick="switchLeftTab('search')">🔎</button>
+      <button class="lt-btn" title="Legend" id="lt-legend" onclick="switchLeftTab('legend')">🎨</button>
+    </div>
+
+    <!-- Graph -->
+    <div class="graph-area">
+      <div id="mynetwork"></div>
+    </div>
+
+    <!-- Right sidebar -->
+    <div class="sidebar" id="sidebar">
+
+      <!-- Info panel -->
+      <div class="panel-tab active" id="panel-info">
+        <div class="sidebar-header">
+          <span class="sidebar-title">Node Inspector</span>
+          <button class="sidebar-close" onclick="closeSidebar()">×</button>
+        </div>
+        <div class="sidebar-body" id="info-body">
+          <div class="sidebar-empty">
+            <div class="empty-icon">👆</div>
+            <div>Click any node in the graph to inspect it</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Search panel -->
+      <div class="panel-tab" id="panel-search">
+        <div class="sidebar-header">
+          <span class="sidebar-title">Semantic Search</span>
+          <button class="sidebar-close" onclick="closeSidebar()">×</button>
+        </div>
+        <div class="sidebar-body">
+          <div class="search-form">
+            <input class="search-input" id="search-input" placeholder="Search the document..." type="text">
+            <button class="search-go" id="search-btn">Go</button>
+          </div>
+          <div id="search-results"></div>
+        </div>
+      </div>
+
+      <!-- Legend panel -->
+      <div class="panel-tab" id="panel-legend">
+        <div class="sidebar-header">
+          <span class="sidebar-title">Graph Legend</span>
+          <button class="sidebar-close" onclick="closeSidebar()">×</button>
+        </div>
+        <div class="sidebar-body">
+          <div class="legend-section">
+            <div class="legend-heading">Node Types</div>
+            <div class="legend-row"><div class="legend-swatch" style="background:#6c5ce7;"></div><div><div>Root</div><div class="legend-sub">Document title — top of the graph</div></div></div>
+            <div class="legend-row"><div class="legend-swatch" style="background:#00b894;"></div><div><div>Section</div><div class="legend-sub">Major headings from the webpage</div></div></div>
+            <div class="legend-row"><div class="legend-swatch box" style="background:#1b1b2a;border:1px solid #363655;"></div><div><div>Concept</div><div class="legend-sub">Key terms extracted by spaCy</div></div></div>
+          </div>
+          <div class="legend-section">
+            <div class="legend-heading">Node Behaviour</div>
+            <div class="legend-row"><div class="legend-swatch" style="background:#00cec9;border-radius:50%;"></div><div><div>Dynamic ✦</div><div class="legend-sub">Has 3+ children — can be explored further</div></div></div>
+            <div class="legend-row"><div class="legend-swatch" style="background:#2d3436;border:1px solid #636e72;"></div><div><div>Static</div><div class="legend-sub">Leaf node — Quick Explain only</div></div></div>
+          </div>
+          <div class="legend-section">
+            <div class="legend-heading">Interactions</div>
+            <div class="legend-row"><div style="font-size:16px">👆</div><div><div>Click node</div><div class="legend-sub">Opens this inspector panel</div></div></div>
+            <div class="legend-row"><div style="font-size:16px">🔭</div><div><div>Explore More</div><div class="legend-sub">Drills into sub-mindmap (dynamic only)</div></div></div>
+            <div class="legend-row"><div style="font-size:16px">💡</div><div><div>Quick Explain</div><div class="legend-sub">AI explanation via local Ollama</div></div></div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /sidebar -->
+  </div><!-- /app-body -->
+</div><!-- /app-screen -->
+
+<script>
+// ══════════════════════════════════════════════
+// CONFIG & STATE
+// ══════════════════════════════════════════════
+const BACKEND = 'http://localhost:5000';
+let graphData   = null;
+let chunkStore  = [];
+let network     = null;
+let navStack    = [];
+let sidebarOpen = true;
+let activeLeftTab = 'info';
+
+// ══════════════════════════════════════════════
+// UPLOAD TAB SWITCHING
+// ══════════════════════════════════════════════
+function switchUploadTab(tab) {
+  ['upload','sample'].forEach(t => {
+    document.getElementById(`tab-${t}`).classList.toggle('active', t===tab);
+    document.getElementById(`tab-${t}-btn`).classList.toggle('active', t===tab);
+  });
+}
+function selectSample(el, type) {
+  document.querySelectorAll('.sample-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  // switch to upload tab so they actually upload a file
+  setTimeout(() => switchUploadTab('upload'), 400);
+}
+
+// ══════════════════════════════════════════════
+// WEBPAGE URL INPUT
+// ══════════════════════════════════════════════
+const dropZone = document.getElementById('drop-zone');
+const urlInput = document.getElementById('url-input');
+const fnameEl  = document.getElementById('fname');
+const goBtn    = document.getElementById('go-btn');
+let currentUrl = '';
+
+function validateUrl(value) {
+  try {
+    const u = new URL(value);
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch { return false; }
+}
+
+urlInput.addEventListener('input', e => {
+  currentUrl = e.target.value.trim();
+  goBtn.disabled = !validateUrl(currentUrl);
+  fnameEl.textContent = validateUrl(currentUrl)
+    ? '🌐 Ready: ' + currentUrl
+    : 'Paste a valid public http/https webpage URL.';
+});
+
+function showErr(msg) {
+  const el = document.getElementById('err-msg');
+  el.textContent = msg; el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 6000);
+}
+
+goBtn.addEventListener('click', () => {
+  if (!validateUrl(currentUrl)) { showErr('Please enter a valid webpage URL.'); return; }
+  startPipeline();
+});
+
+// ══════════════════════════════════════════════
+// PIPELINE
+// ══════════════════════════════════════════════
+const STEPS = ['ls-1','ls-2','ls-3','ls-4','ls-5','ls-6'];
+const STEP_MSGS = ['Fetching webpage...','Parsing HTML nodes...','Chunking content...','Extracting concepts...','Building graph...','Rendering...'];
+let stepIdx = 0, stepTimer = null;
+
+function advanceStep() {
+  if (stepIdx > 0 && stepIdx <= STEPS.length)
+    document.getElementById(STEPS[stepIdx-1]).className = 'ls done';
+  if (stepIdx < STEPS.length) {
+    document.getElementById(STEPS[stepIdx]).className = 'ls active';
+    document.getElementById('load-sub').textContent = STEP_MSGS[stepIdx];
+    stepIdx++;
+  }
+}
+
+async function startPipeline() {
+  document.getElementById('upload-screen').style.display = 'none';
+  const overlay = document.getElementById('loading-overlay');
+  overlay.style.display = 'flex';
+  stepIdx = 0;
+  STEPS.forEach(id => document.getElementById(id).className = 'ls');
+  advanceStep();
+  stepTimer = setInterval(advanceStep, 1000);
+
+  try {
+    const res  = await fetch(`${BACKEND}/process`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ url: currentUrl })
+    });
+    const data = await res.json();
+    clearInterval(stepTimer);
+    if (!res.ok || data.error) {
+      overlay.style.display = 'none';
+      document.getElementById('upload-screen').style.display = 'flex';
+      showErr(data.error || 'Pipeline failed. Is Flask running? (python app.py)');
+      return;
+    }
+    STEPS.forEach(id => document.getElementById(id).className = 'ls done');
+    graphData  = data.graph;
+    chunkStore = data.chunks || [];
+    setTimeout(() => { overlay.style.display='none'; initApp(data); }, 500);
+  } catch {
+    clearInterval(stepTimer);
+    overlay.style.display = 'none';
+    document.getElementById('upload-screen').style.display = 'flex';
+    showErr('Cannot reach Flask at localhost:5000. Run: python app.py');
+  }
+}
+
+// ══════════════════════════════════════════════
+// APP INIT
+// ══════════════════════════════════════════════
+function initApp(data) {
+  document.getElementById('app-screen').style.display = 'flex';
+
+  // Stats bar
+  const s = data.stats || {};
+  document.getElementById('stat-pages').textContent    = s.pages    || '—';
+  document.getElementById('stat-sections').textContent = s.sections || '—';
+  document.getElementById('stat-concepts').textContent = s.concepts || '—';
+  document.getElementById('stat-dynamic').textContent  = s.dynamic  || '—';
+  document.getElementById('stat-nodes').textContent    = graphData.nodes.length;
+  document.getElementById('doc-chip').innerHTML        = `<span>${data.title || currentUrl}</span>`;
+
+  navStack = [];
+  renderView(null);
+}
+
+document.getElementById('new-map-btn').addEventListener('click', () => {
+  if (network) { network.destroy(); network = null; }
+  document.getElementById('app-screen').style.display = 'none';
+  document.getElementById('upload-screen').style.display = 'flex';
+  graphData = null; chunkStore = []; navStack = [];
+  currentUrl = ''; fnameEl.textContent = 'Paste a public webpage URL to generate a mindmap.'; goBtn.disabled = true; urlInput.value = '';
+  STEPS.forEach(id => document.getElementById(id).className = 'ls');
+});
+
+// ══════════════════════════════════════════════
+// SIDEBAR & LEFT TABS
+// ══════════════════════════════════════════════
+function switchLeftTab(tab) {
+  activeLeftTab = tab;
+  ['info','search','legend'].forEach(t => {
+    document.getElementById(`lt-${t}`).classList.toggle('active', t===tab);
+    document.getElementById(`panel-${t}`).classList.toggle('active', t===tab);
+  });
+  document.getElementById('sidebar').classList.remove('collapsed');
+  sidebarOpen = true;
+}
+
+function closeSidebar() {
+  document.getElementById('sidebar').classList.add('collapsed');
+  sidebarOpen = false;
+  ['info','search','legend'].forEach(t => document.getElementById(`lt-${t}`).classList.remove('active'));
+}
+
+// ══════════════════════════════════════════════
+// RENDER VIEW
+// ══════════════════════════════════════════════
+function renderView(focusId) {
+  const nodeMap = {};
+  graphData.nodes.forEach(n => nodeMap[n.id] = n);
+  const children = {};
+  graphData.edges.forEach(e => { if (!children[e.from]) children[e.from]=[]; children[e.from].push(e.to); });
+
+  const show = new Set();
+  if (focusId === null) {
+    const root = graphData.nodes.find(n => n.level==='root') || graphData.nodes[0];
+    show.add(root.id);
+    (children[root.id]||[]).forEach(id => show.add(id));
+  } else {
+    show.add(focusId);
+    (children[focusId]||[]).forEach(id => show.add(id));
+  }
+
+  const vNodes = [];
+  show.forEach(id => {
+    const n = nodeMap[id];
+    if (!n) return;
+    const isRoot = n.level==='root', isDyn = n.dynamic;
+    let bg, border, shape, fsize, size;
+    if (isRoot)     { bg='#3b3080'; border='#6c5ce7'; shape='ellipse'; fsize=14; size=32; }
+    else if (isDyn) { bg='#0a3d2e'; border='#00cec9'; shape='ellipse'; fsize=13; size=25; }
+    else            { bg='#131320'; border='#2a2a40'; shape='box';     fsize=12; size=20; }
+    const label   = n.label||n.id;
+    const display = label.length>22 ? label.slice(0,20)+'…' : label;
+    vNodes.push({
+      id: n.id, label: display,
+      color:{ background:bg, border, highlight:{background:bg,border:'#a29bfe'}, hover:{background:bg,border:'#a29bfe'} },
+      shape, size, font:{color:'#dfe6e9',size:fsize,face:'Inter'},
+      borderWidth:(isRoot||isDyn)?2:1, borderWidthSelected:3, margin:12,
+      shadow: isRoot ? {enabled:true,color:'rgba(108,92,231,0.2)',size:18} : false,
+      title:`<div style="font-family:monospace;font-size:11px;padding:6px 8px;max-width:200px;line-height:1.5">${label}<br><span style="color:#636e72">${isDyn?'✦ Dynamic · click to explore':'Static node'} · p${n.page}</span></div>`
+    });
+  });
+
+  const vEdges = [];
+  graphData.edges.forEach(e => {
+    if (show.has(e.from)&&show.has(e.to))
+      vEdges.push({ from:e.from, to:e.to, color:{color:'#1e1e2e',highlight:'#6c5ce7',hover:'#4a3ab0'}, width:1.5, smooth:{type:'cubicBezier',roundness:0.35} });
+  });
+
+  if (network) { network.destroy(); network=null; }
+  network = new vis.Network(
+    document.getElementById('mynetwork'),
+    { nodes:new vis.DataSet(vNodes), edges:new vis.DataSet(vEdges) },
+    {
+      physics:{ solver:'barnesHut', barnesHut:{gravitationalConstant:-9000,centralGravity:0.35,springLength:170,springConstant:0.04,damping:0.1}, stabilization:{iterations:220,updateInterval:25} },
+      interaction:{ hover:true, tooltipDelay:350 },
+      layout:{ improvedLayout:true }
+    }
+  );
+  network.once('stabilizationIterationsDone', () => network.fit({animation:{duration:700,easingFunction:'easeInOutQuad'}}));
+  network.on('click', params => {
+    if (!params.nodes.length) return;
+    const n = nodeMap[params.nodes[0]];
+    if (!n) return;
+    showNodeInSidebar(n);
+  });
+  network.on('dragStart', () => {});
+  updateBreadcrumb(nodeMap);
+}
+
+// ══════════════════════════════════════════════
+// SIDEBAR — NODE INFO
+// ══════════════════════════════════════════════
+function showNodeInSidebar(n) {
+  switchLeftTab('info');
+  const body = document.getElementById('info-body');
+  const isDyn  = n.dynamic;
+  const badgeCls = n.level==='root' ? 'badge-root' : n.level==='section' ? 'badge-section' : 'badge-concept';
+  body.innerHTML = `
+    <div class="node-card">
+      <div class="node-card-header">
+        <span class="node-level-badge ${badgeCls}">${n.level}</span>
+        ${isDyn ? '<span class="node-level-badge badge-dynamic">✦ dynamic</span>' : ''}
+      </div>
+      <div class="node-name">${n.label||n.id}</div>
+      <div class="node-meta">Page ${n.page} · ${n.child_count} child node${n.child_count!==1?'s':''}</div>
+    </div>
+
+    <button class="action-btn" id="sb-explain-btn">
+      <div class="a-ico explain-ico">💡</div>
+      <div>Quick Explain<span class="a-sub">AI definition via Gemini</span></div>
+    </button>
+
+    <button class="action-btn explore-btn" id="sb-explore-btn" ${!isDyn?'disabled':''}>
+      <div class="a-ico explore-ico">🔭</div>
+      <div>Explore More<span class="a-sub">${isDyn ? 'Drill into sub-mindmap' : 'Static node — no children to expand'}</span></div>
+    </button>
+
+    <div id="sb-explain-result" style="display:none"></div>
+  `;
+
+  document.getElementById('sb-explain-btn').addEventListener('click', () => fetchAndShowExplanation(n));
+  document.getElementById('sb-explore-btn').addEventListener('click', () => {
+    if (!n.dynamic) return;
+    navStack.push({ nodeId:n.id, label:n.label||n.id });
+    renderView(n.id);
+  });
+}
+
+async function fetchAndShowExplanation(n) {
+  const resultEl = document.getElementById('sb-explain-result');
+  resultEl.style.display = 'block';
+  resultEl.innerHTML = `<div class="explain-box loading"><div class="spinner"></div>&nbsp;Asking Gemini…</div>`;
+  try {
+    const res  = await fetch(`${BACKEND}/explain`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ label:n.label||n.id, body_text:n.body_text||'', level:n.level||'concept', gemini_key:"AIzaSyDeF9p1Oo3wBkO7e-0x-GrHn1whwAjNivU" })
+    });
+    const data = await res.json();
+    resultEl.innerHTML = `
+      <div class="explain-box">${data.explanation||'No explanation returned.'}</div>
+      <div class="explain-powered">Gemini · 2.5 Flash</div>`;
+  } catch {
+    resultEl.innerHTML = `<div class="explain-box">Could not reach Gemini. Check API key.</div>`;
+  }
+}
+
+// ══════════════════════════════════════════════
+// BREADCRUMB
+// ══════════════════════════════════════════════
+function updateBreadcrumb(nodeMap) {
+  const bc   = document.getElementById('breadcrumb');
+  bc.innerHTML = '';
+  const root = graphData.nodes.find(n=>n.level==='root')||graphData.nodes[0];
+  const mk = (label, onClick, active) => {
+    const el = document.createElement('span');
+    el.className = 'bc'+(active?' active':'');
+    el.textContent = label.length>16 ? label.slice(0,14)+'…' : label;
+    el.onclick = onClick; return el;
+  };
+  const sep = () => { const s=document.createElement('span'); s.className='bc-sep'; s.textContent='/'; return s; };
+  bc.appendChild(mk(root.label||root.id, ()=>{ navStack=[]; renderView(null); }, navStack.length===0));
+  navStack.forEach((e,i) => {
+    bc.appendChild(sep());
+    bc.appendChild(mk(e.label, ()=>{ navStack=navStack.slice(0,i+1); renderView(e.nodeId); }, i===navStack.length-1));
+  });
+}
+
+// ══════════════════════════════════════════════
+// SEARCH
+// ══════════════════════════════════════════════
+document.getElementById('search-btn').addEventListener('click', doSearch);
+document.getElementById('search-input').addEventListener('keydown', e=>{ if(e.key==='Enter') doSearch(); });
+
+async function doSearch() {
+  const q   = document.getElementById('search-input').value.trim();
+  const res = document.getElementById('search-results');
+  if (!q||!chunkStore.length) return;
+  res.innerHTML = '<div class="no-results">Searching…</div>';
+  try {
+    const r    = await fetch(`${BACKEND}/search`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({query:q,chunks:chunkStore,k:5}) });
+    const data = await r.json();
+    if (!data.results||!data.results.length) { res.innerHTML='<div class="no-results">No results found.</div>'; return; }
+    res.innerHTML = '';
+    data.results.forEach(r => {
+      const card = document.createElement('div');
+      card.className = 'sr-card';
+      card.innerHTML = `<div class="sr-section">§ ${r.section} · p${r.page}</div><div class="sr-text">${r.text.slice(0,160)}…</div><div class="sr-score">relevance: ${r.score.toFixed(3)}</div>`;
+      card.onclick = () => {
+        const sn = graphData.nodes.find(n=>n.label===r.section||n.id===r.section);
+        if (sn) { switchLeftTab('info'); showNodeInSidebar(sn); }
+      };
+      res.appendChild(card);
+    });
+  } catch {
+    res.innerHTML = '<div class="no-results" style="color:var(--red)">Search failed.</div>';
+  }
+}
+</script>
+</body>
+</html>
